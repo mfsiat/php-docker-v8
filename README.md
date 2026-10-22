@@ -1,6 +1,6 @@
-# PHP Docker v8 (Custom PHP 8.2 Image) 🐘🐳
+# PHP Docker v8 (Custom PHP 8.5 Image) 🐘🐳
 
-This repository provides a **customized PHP 8.2 Docker image** based on `php:8.2-fpm-alpine`, preconfigured with commonly used PHP extensions and tools for modern PHP application development.
+This repository provides a **customized PHP 8.5 Docker image** based on `php:8.5-fpm-alpine`, preconfigured with commonly used PHP extensions and tools for modern PHP application development.
 
 The image is lightweight, fast, and suitable for **Laravel**, **Symfony**, or any PHP application that requires database connectivity and Composer support.
 
@@ -10,7 +10,7 @@ The image is lightweight, fast, and suitable for **Laravel**, **Symfony**, or an
 
 This Docker image comes with the following pre-installed:
 
-* **PHP 8.2 (FPM)**
+* **PHP 8.5 (FPM)**
 * **Alpine Linux** (small image size)
 * PHP Extensions:
 
@@ -19,11 +19,11 @@ This Docker image comes with the following pre-installed:
   * `pdo_mysql`
 * System Libraries:
 
-  * `libzip-dev`
+  * `libzip` (runtime)
 * Tools:
 
-  * **Composer** (latest)
-  * **PHPUnit** (installed via Composer)
+  * **Composer 2** (latest)
+* Runs as a non-root `www` user (UID/GID 1000)
 
 ---
 
@@ -31,7 +31,7 @@ This Docker image comes with the following pre-installed:
 
 ```
 .
-├── Dockerfile          # Custom PHP 8.2 Docker image
+├── Dockerfile          # Custom PHP 8.5 Docker image
 ├── .github
 │   └── workflows
 │       └── deploy.yml  # GitHub Actions workflow (optional CI/CD)
@@ -43,7 +43,7 @@ This Docker image comes with the following pre-installed:
 ## 🧱 Base Image
 
 ```
-php:8.2-fpm-alpine
+php:8.5-fpm-alpine
 ```
 
 Why Alpine?
@@ -58,15 +58,16 @@ Why Alpine?
 
 The Dockerfile performs the following steps:
 
-1. Uses PHP 8.2 FPM Alpine as base image
-2. Installs required system packages (`zip`, `libzip-dev`)
+1. Uses PHP 8.5 FPM Alpine as base image
+2. Installs runtime packages (`zip`, `libzip`) and temporary build dependencies (`libzip-dev`)
 3. Enables and installs PHP extensions:
 
    * `zip`
    * `pdo`
    * `pdo_mysql`
-4. Installs **Composer** globally
-5. Installs **PHPUnit** using Composer
+4. Removes temporary build dependencies to keep the image small
+5. Copies the **Composer 2** binary from the official Composer image
+6. Creates a non-root `www` user and runs the container as that user
 
 ---
 
@@ -82,7 +83,7 @@ cd php-docker-v8
 Build the Docker image:
 
 ```
-docker build -t php-docker-v8:8.2 .
+docker build -t php-docker-v8:8.5 .
 ```
 
 ---
@@ -93,10 +94,10 @@ Example command to run the container:
 
 ```
 docker run -d \
-  --name php82 \
+  --name php85 \
   -v $(pwd):/var/www/html \
   -p 9000:9000 \
-  php-docker-v8:8.2
+  php-docker-v8:8.5
 ```
 
 This exposes PHP-FPM on port **9000**.
@@ -108,25 +109,19 @@ This exposes PHP-FPM on port **9000**.
 Check PHP version:
 
 ```
-docker exec -it php82 php -v
+docker exec -it php85 php -v
 ```
 
 Check installed extensions:
 
 ```
-docker exec -it php82 php -m
+docker exec -it php85 php -m
 ```
 
 Verify Composer:
 
 ```
-docker exec -it php82 composer --version
-```
-
-Verify PHPUnit:
-
-```
-docker exec -it php82 ./vendor/bin/phpunit --version
+docker exec -it php85 composer --version
 ```
 
 ---
@@ -147,7 +142,7 @@ Typical setup:
 
 * This image is intended for **development and testing**
 * Additional PHP extensions can be added as needed
-* PHPUnit is installed globally via Composer (can be adjusted)
+* Application dependencies (including PHPUnit) should be installed per project via Composer
 
 ---
 
@@ -155,7 +150,6 @@ Typical setup:
 
 * Add Redis / GD / Intl extensions
 * Multi-stage build for production
-* Non-root user for security
 * Separate dev and prod images
 
 ---
