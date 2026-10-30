@@ -1,6 +1,6 @@
 # PHP Docker v8 (Custom PHP 8.5 Image) 🐘🐳
 
-This repository provides a **customized PHP 8.5 Docker image** based on `php:8.5-fpm-alpine`, preconfigured with commonly used PHP extensions and tools for modern PHP application development.
+This repository provides a **customized PHP 8.5 Docker image** based on `php:8.5-fpm-alpine`, preconfigured with commonly used PHP extensions, security defaults, and tools for modern PHP application development.
 
 The image is lightweight, fast, and suitable for **Laravel**, **Symfony**, or any PHP application that requires database connectivity and Composer support.
 
@@ -23,7 +23,12 @@ This Docker image comes with the following pre-installed:
 * Tools:
 
   * **Composer 2** (latest)
-* Runs as a non-root `www` user (UID/GID 1000)
+* Security defaults:
+
+  * Runs as a non-root `www` user (UID/GID 1000)
+  * Hardened `php.ini` defaults in `conf/security.ini`
+  * `EXPOSE 9000` and a container healthcheck
+  * Alpine packages upgraded at build time to pick up security patches
 
 ---
 
@@ -31,10 +36,16 @@ This Docker image comes with the following pre-installed:
 
 ```
 .
-├── Dockerfile          # Custom PHP 8.5 Docker image
+├── Dockerfile                  # Custom PHP 8.5 Docker image
+├── conf
+│   └── security.ini            # Hardened PHP settings
+├── .dockerignore               # Keeps the build context small
+├── .hadolint.yaml              # Dockerfile lint configuration
 ├── .github
+│   ├── dependabot.yml          # Automated dependency updates
 │   └── workflows
-│       └── deploy.yml  # GitHub Actions workflow (optional CI/CD)
+│       ├── ci.yml              # PR validation: lint, build, test, scan
+│       └── deploy.yml          # Build, scan and publish to Docker Hub
 └── README.md
 ```
 
@@ -52,6 +63,8 @@ Why Alpine?
 * Faster pull and build times
 * Reduced attack surface
 
+Alpine packages are upgraded during the build so that security fixes are included even when the base image tag has not moved yet.
+
 ---
 
 ## 🛠 Dockerfile Overview
@@ -59,15 +72,17 @@ Why Alpine?
 The Dockerfile performs the following steps:
 
 1. Uses PHP 8.5 FPM Alpine as base image
-2. Installs runtime packages (`zip`, `libzip`) and temporary build dependencies (`libzip-dev`)
-3. Enables and installs PHP extensions:
+2. Upgrades Alpine packages and installs runtime packages (`zip`, `libzip`)
+3. Installs temporary build dependencies (`libzip-dev`) and enables:
 
    * `zip`
    * `pdo`
    * `pdo_mysql`
 4. Removes temporary build dependencies to keep the image small
 5. Copies the **Composer 2** binary from the official Composer image
-6. Creates a non-root `www` user and runs the container as that user
+6. Copies the hardened PHP settings from `conf/security.ini`
+7. Creates a non-root `www` user and runs the container as that user
+8. Exposes port `9000` and defines a healthcheck
 
 ---
 
@@ -90,7 +105,7 @@ docker build -t php-docker-v8:8.5 .
 
 ## ▶️ Run the Container
 
-Example command to run the container:
+Simple example:
 
 ```
 docker run -d \
@@ -100,11 +115,26 @@ docker run -d \
   php-docker-v8:8.5
 ```
 
+Hardened example (recommended):
+
+```
+docker run -d \
+  --name php85 \
+  --read-only \
+  --tmpfs /tmp \
+  --tmpfs /run \
+  --cap-drop ALL \
+  --security-opt no-new-privileges:true \
+  -v $(pwd):/var/www/html:ro \
+  -p 9000:9000 \
+  php-docker-v8:8.5
+```
+
 This exposes PHP-FPM on port **9000**.
 
 ---
 
-## 🧪 Verify Installed Extensions
+## 🧪 Verify the Image
 
 Check PHP version:
 
@@ -124,6 +154,18 @@ Verify Composer:
 docker exec -it php85 composer --version
 ```
 
+Verify the container runs as non-root:
+
+```
+docker exec -it php85 id
+```
+
+Check the health status:
+
+```
+docker inspect --format '{{json .State.Health}}' php85
+```
+
 ---
 
 ## 🧩 Use with Nginx (Recommended)
@@ -138,11 +180,43 @@ Typical setup:
 
 ---
 
+## 🔐 Security Automation
+
+### Pull request validation
+
+`.github/workflows/ci.yml` runs on every pull request and:
+
+1. Lints the Dockerfile with **Hadolint**
+2. Builds the image
+3. Runs smoke tests (PHP version, extensions, Composer, non-root user, hardened settings)
+4. Scans the image with **Trivy**
+5. Fails on `HIGH` or `CRITICAL` vulnerabilities with a fix available
+6. Uploads results to the GitHub Security tab
+
+### Daily builds and scans
+
+`.github/workflows/deploy.yml` runs on:
+
+* Pushes to `master`
+* A daily schedule (`03:17 UTC`)
+* Manual dispatch
+
+Before pushing, it builds and scans the image. The push is skipped if a `HIGH` or `CRITICAL` vulnerability with a fix is found. Images are published with `latest`, `8.5`, and commit-SHA tags, plus SBOM and provenance attestations.
+
+### Dependency updates
+
+Dependabot checks GitHub Actions weekly and the Docker base image daily.
+
+---
+
 ## ⚠️ Notes
 
 * This image is intended for **development and testing**
-* Additional PHP extensions can be added as needed
 * Application dependencies (including PHPUnit) should be installed per project via Composer
+* `conf/security.ini` is a set of defaults; override them per project with a mounted `.ini` file or `PHP_INI_SCAN_DIR`
+* Enable `session.cookie_secure = 1` when the application is served over HTTPS
+* Additional hardening such as `open_basedir` and `disable_functions` is application-specific; test before enabling
+* For production, consider separate dev and runtime images and disabling Composer at runtime
 
 ---
 
@@ -151,6 +225,8 @@ Typical setup:
 * Add Redis / GD / Intl extensions
 * Multi-stage build for production
 * Separate dev and prod images
+* Sign published images with Cosign
+* Pin deployments to immutable image digests
 
 ---
 
@@ -162,4 +238,3 @@ GitHub: [https://github.com/mfsiat](https://github.com/mfsiat)
 ---
 
 ⭐ If you find this image useful, consider starring the repository!
-
