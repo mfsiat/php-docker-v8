@@ -1,0 +1,7 @@
+failure-threshold: warning
+
+ignored:
+  # Base packages intentionally track the latest Alpine security patches.
+  - DL3018
+  # The image uses a named non-root user; UID 1000 is fixed in the Dockerfile.
+  - DL3066

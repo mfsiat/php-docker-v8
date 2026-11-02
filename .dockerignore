@@ -1,0 +1,16 @@
+.git
+.github
+.gitignore
+.dockerignore
+.hadolint.yaml
+README.md
+*.md
+.env
+.env.*
+vendor/
+node_modules/
+tests/
+docker-compose*.yml
+.idea/
+.vscode/
+*.log
